@@ -15,15 +15,20 @@ namespace HeadCullingMask
     {
         public override string Name => "HeadCullingMask";
         public override string Author => "hantabaru1014";
-        public override string Version => "1.0.0";
+        public override string Version => "1.1.0";
+        public override string Link => "https://github.com/hantabaru1014/HeadCullingMask";
 
         public static readonly string TARGET_COMMENT_TEXT = "net.hantabaru1014.HeadCullingMask.TargetSlot";
         public static readonly byte USE_LAYER = 10;
 
         private static readonly FieldInfo forceLayerFieldInfo = AccessTools.Field(typeof(SlotConnector), "forceLayer");
 
+        private static Dictionary<RefID, Slot> avatars;
+
         public override void OnEngineInit()
         {
+            avatars = new Dictionary<RefID, Slot>();
+
             Harmony harmony = new Harmony("net.hantabaru1014.HeadCullingMask");
             harmony.PatchAll();
 
@@ -39,28 +44,50 @@ namespace HeadCullingMask
             }
         }
 
-        [HarmonyPatch(typeof(AvatarRoot), nameof(AvatarRoot.Equip))]
-        class AvatarRootEquipPatch
+        [HarmonyPatch(typeof(ComponentBase<FrooxEngine.Component>), "OnStart")]
+        class ComponentBase_OnStart_Patch
         {
-            static void Postfix(AvatarRoot __instance)
+            static void Postfix(FrooxEngine.Component __instance)
             {
-                Msg("Avatar Equip!");
-                UpdateLayer(__instance.Slot, USE_LAYER, true);
+                if (!(__instance is AvatarObjectSlot)) return;
+                if ((__instance.Slot?.ActiveUser?.IsLocalUser ?? false) && (__instance.Slot.Name?.StartsWith("User") ?? false))
+                {
+                    AvatarObjectSlot avatarObjSlot = __instance as AvatarObjectSlot;
+                    avatarObjSlot.Equipped.OnTargetChange += Equipped_OnTargetChange;
+                    __instance.Disposing += Worker_Disposing;
+                    Msg($"Found AvatarObjectSlot. RefID: {avatarObjSlot.ReferenceID}");
+                }
             }
-        }
 
-        [HarmonyPatch(typeof(AvatarRoot), nameof(AvatarRoot.Dequip))]
-        class AvatarRootDequipPatch
-        {
-            static void Postfix(AvatarRoot __instance)
+            private static void Worker_Disposing(Worker obj)
             {
-                Msg("Avatar Dequip!");
-                UpdateLayer(__instance.Slot, 0, false);
+                avatars.Remove(obj.ReferenceID);
+                Msg($"Dispose AvatarObjectSlot. RefID: {obj.ReferenceID}");
+            }
+
+            private static void Equipped_OnTargetChange(SyncRef<IAvatarObject> avatarObj)
+            {
+                if (avatarObj?.Target?.Node != BodyNode.Root) return;
+                if (avatars.TryGetValue(avatarObj.Worker.ReferenceID, out var oldAvatar))
+                {
+                    if (!(oldAvatar is null))
+                    {
+                        Msg($"Avatar Dequip : {oldAvatar.Name}");
+                        UpdateLayer(oldAvatar, 0, false);
+                        avatars[avatarObj.Worker.ReferenceID] = null;
+                    }
+                }
+                if (avatarObj.State == ReferenceState.Available)
+                {
+                    Msg($"Avatar Equip : {avatarObj.Target.Slot.Name}");
+                    UpdateLayer(avatarObj.Target.Slot, USE_LAYER, true);
+                    avatars[avatarObj.Worker.ReferenceID] = avatarObj.Target.Slot;
+                }
             }
         }
 
         [HarmonyPatch(typeof(HeadOutput), "Awake")]
-        class HeadOutputAwakePatch
+        class HeadOutput_Awake_Patch
         {
             static void Postfix(List<UnityEngine.Camera> ___cameras)
             {
@@ -73,7 +100,7 @@ namespace HeadCullingMask
         }
 
         [HarmonyPatch(typeof(CameraPortal), "RenderReflection")]
-        class CameraPortalRenderReflectionPatch
+        class CameraPortal_RenderReflection_Patch
         {
             static void Prefix(UnityEngine.Camera reflectionCamera)
             {
@@ -81,10 +108,10 @@ namespace HeadCullingMask
             }
         }
 
-        private static void UpdateLayer(Slot avatarRootSlot, byte layer, bool excludeDisable)
+        private static void UpdateLayer(Slot avatarRootSlot, byte layer, bool excludeDisabled)
         {
             List<Comment> list = Pool.BorrowList<Comment>();
-            avatarRootSlot.GetComponentsInChildren<Comment>(list, (Comment c) => c.Text.Value == TARGET_COMMENT_TEXT, excludeDisable, false);
+            avatarRootSlot.GetComponentsInChildren<Comment>(list, (Comment c) => (!excludeDisabled || c.Enabled) && c.Text.Value == TARGET_COMMENT_TEXT, false, false);
             foreach (var comment in list)
             {
                 forceLayerFieldInfo.SetValue((SlotConnector)comment.Slot.Connector, layer);

@@ -10,6 +10,8 @@
     <CopyToMods Condition="'$(CopyToMods)'==''">true</CopyToMods>
     <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
     <DebugType Condition="'$(Configuration)'=='Release'">None</DebugType>
+    <Version>1.1.0</Version>
+    <Authors>hantabaru1014</Authors>
   </PropertyGroup>
 
   <ItemGroup>

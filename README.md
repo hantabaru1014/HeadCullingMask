@@ -3,7 +3,7 @@
 A [NeosModLoader](https://github.com/zkxs/NeosModLoader) mod for [Neos VR](https://neos.com/) that make your avatar's head invisible only to your FPV.  
 (Looks like NearClip, but others are visible at near distance).  
 
-## How To Use
+## Usage
 - Attach a Comment component to the avatar's face and hair (what you want to hide) slot and set "`net.hantabaru1014.HeadCullingMask.TargetSlot`" to Text.
 - It only works when the Comment component's Enabled is True.
 - It is processed when the avatar is equiped, so if the Comment component is setup while the avatar is on, it must be equip again.
