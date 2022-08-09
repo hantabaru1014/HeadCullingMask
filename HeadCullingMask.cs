@@ -15,13 +15,14 @@ namespace HeadCullingMask
     {
         public override string Name => "HeadCullingMask";
         public override string Author => "hantabaru1014";
-        public override string Version => "1.1.0";
+        public override string Version => "1.2.0";
         public override string Link => "https://github.com/hantabaru1014/HeadCullingMask";
 
-        public static readonly string TARGET_COMMENT_TEXT = "net.hantabaru1014.HeadCullingMask.TargetSlot";
-        public static readonly byte USE_LAYER = 10;
+        public const string TARGET_COMMENT_TEXT = "net.hantabaru1014.HeadCullingMask.TargetSlot";
+        public const byte USE_LAYER = 10;
 
         private static readonly FieldInfo forceLayerFieldInfo = AccessTools.Field(typeof(SlotConnector), "forceLayer");
+        private static readonly MethodInfo updateLayerMethodInfo = AccessTools.Method(typeof(SlotConnector), "UpdateLayer");
 
         private static Dictionary<RefID, Slot> avatars;
 
@@ -86,6 +87,32 @@ namespace HeadCullingMask
             }
         }
 
+        [HarmonyPatch(typeof(ScreenController), "OnInputUpdate")]
+        class ScreenController_OnInputUpdate_Patch
+        {
+            static void Postfix(ScreenController __instance, ScreenInputs ____input, SyncRef<FirstPersonTargettingController> ____firstPerson)
+            {
+                if (__instance.World.IsUserspace()) return;
+                if (____input.ToggleFirstAndThirdPerson.Pressed || ____input.ToggleFreeformCamera.Pressed)
+                {
+                    var avatarRoot = __instance.Slot.GetComponent<AvatarObjectSlot>(
+                            avObj => avObj.Equipped.Target?.Node == BodyNode.Root && avObj.Equipped.State == ReferenceState.Available
+                        )?.Equipped.Target?.Slot;
+                    if (avatarRoot is null) return;
+                    if (__instance.ActiveTargetting.Target != ____firstPerson.Target)
+                    {
+                        Msg($"Toggle to ThirdPerson.");
+                        UpdateLayer(avatarRoot, 0, false, true);
+                    }
+                    else
+                    {
+                        Msg($"Toggle to FirstPerson.");
+                        UpdateLayer(avatarRoot, USE_LAYER, true, true);
+                    }
+                }
+            }
+        }
+
         [HarmonyPatch(typeof(HeadOutput), "Awake")]
         class HeadOutput_Awake_Patch
         {
@@ -108,13 +135,15 @@ namespace HeadCullingMask
             }
         }
 
-        private static void UpdateLayer(Slot avatarRootSlot, byte layer, bool excludeDisabled)
+        private static void UpdateLayer(Slot avatarRootSlot, byte layer, bool excludeDisabled, bool forceUpdate = false)
         {
             List<Comment> list = Pool.BorrowList<Comment>();
             avatarRootSlot.GetComponentsInChildren<Comment>(list, (Comment c) => (!excludeDisabled || c.Enabled) && c.Text.Value == TARGET_COMMENT_TEXT, false, false);
             foreach (var comment in list)
             {
-                forceLayerFieldInfo.SetValue((SlotConnector)comment.Slot.Connector, layer);
+                var connector = (SlotConnector)comment.Slot.Connector;
+                forceLayerFieldInfo.SetValue(connector, layer);
+                if (forceUpdate) updateLayerMethodInfo.Invoke(connector, null);
                 Msg($"SetLayer : {comment.Slot.Name} to {(int)layer}");
             }
         }
