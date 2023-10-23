@@ -1,17 +1,17 @@
-﻿using NeosModLoader;
+﻿using ResoniteModLoader;
 using HarmonyLib;
 using FrooxEngine;
 using FrooxEngine.CommonAvatar;
 using System.Collections.Generic;
-using BaseX;
-using UnityNeos;
+using Elements.Core;
+using UnityFrooxEngineRunner;
 using System.Reflection;
 using UnityEngine;
 using System.Linq;
 
 namespace HeadCullingMask
 {
-    public class HeadCullingMask : NeosMod
+    public class HeadCullingMask : ResoniteMod
     {
         public override string Name => "HeadCullingMask";
         public override string Author => "hantabaru1014";
