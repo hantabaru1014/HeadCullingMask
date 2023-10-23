@@ -15,7 +15,7 @@ namespace HeadCullingMask
     {
         public override string Name => "HeadCullingMask";
         public override string Author => "hantabaru1014";
-        public override string Version => "1.2.0";
+        public override string Version => "2.0.0";
         public override string Link => "https://github.com/hantabaru1014/HeadCullingMask";
 
         public const string TARGET_COMMENT_TEXT = "net.hantabaru1014.HeadCullingMask.TargetSlot";
